@@ -9,6 +9,7 @@ signal desire_collected(amount: int)
 @export var lane_lerp_speed: float = 16.0
 @export var jump_speed: float = -760.0
 @export var gravity_strength: float = 2100.0
+@export var ground_y: float = 500.0
 
 var lane_index: int = 1
 var jump_count: int = 0
@@ -16,6 +17,10 @@ var vertical_velocity: float = 0.0
 var y_offset: float = 0.0
 var is_ducking: bool = false
 var health: int = 3
+
+func _ready() -> void:
+	if position.y != 0.0:
+		ground_y = position.y
 
 func move_lane(direction: int) -> bool:
 	var next_lane: int = clamp(lane_index + direction, 0, lane_positions.size() - 1)
@@ -54,6 +59,9 @@ func collect_desire(amount: int) -> void:
 func get_lane_offset() -> float:
 	return lane_positions[lane_index]
 
+func is_airborne() -> bool:
+	return jump_count > 0 or y_offset < -8.0
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("move_left"):
 		move_lane(-1)
@@ -74,4 +82,4 @@ func _physics_process(delta: float) -> void:
 
 	var target_x: float = get_lane_offset()
 	position.x = lerp(position.x, target_x, min(1.0, lane_lerp_speed * delta))
-	position.y = y_offset
+	position.y = ground_y + y_offset

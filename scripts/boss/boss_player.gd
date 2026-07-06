@@ -15,6 +15,7 @@ var health: int = 3
 var jump_count: int = 0
 var dash_time_left: float = 0.0
 var facing: float = 1.0
+var is_ducking: bool = false
 
 func _physics_process(delta: float) -> void:
 	var axis := Input.get_axis("move_left", "move_right")
@@ -33,9 +34,16 @@ func _physics_process(delta: float) -> void:
 		jump_count += 1
 	if Input.is_action_just_pressed("dash"):
 		dash_time_left = dash_seconds
+	if Input.is_action_pressed("duck"):
+		set_ducking(true)
+	elif Input.is_action_just_released("duck"):
+		set_ducking(false)
 	if Input.is_action_just_pressed("attack"):
 		attacked.emit()
 	move_and_slide()
+
+func set_ducking(active: bool) -> void:
+	is_ducking = active
 
 func apply_hit(damage: int) -> void:
 	health = max(health - damage, 0)

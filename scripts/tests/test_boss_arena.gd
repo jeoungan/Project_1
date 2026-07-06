@@ -32,5 +32,13 @@ func _initialize() -> void:
 		return
 
 	boss.free()
+
+	var player = load("res://scripts/boss/boss_player.gd").new()
+	root.add_child(player)
+	player.set_ducking(true)
+	if not _check(player.is_ducking, "boss player can duck"):
+		return
+	player.free()
+
 	print("test_boss_arena passed")
 	quit(0)

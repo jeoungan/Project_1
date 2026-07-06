@@ -9,7 +9,7 @@ var patterns: Array = [
 	{"distance": 300.0, "kind": "falling_tile", "lane": 0, "height": "ground"},
 	{"distance": 430.0, "kind": "paper_laser", "lane": 2, "height": "high"},
 	{"distance": 560.0, "kind": "chalk", "lane": 0, "height": "mid"},
-	{"distance": 680.0, "kind": "key", "lane": 2, "height": "item"},
+	{"distance": 680.0, "kind": "key", "lane": 2, "height": "item", "desire": 100},
 	{"distance": 820.0, "kind": "desk", "lane": 0, "height": "ground"},
 	{"distance": 940.0, "kind": "shockwave", "lane": 2, "height": "low"},
 	{"distance": 1060.0, "kind": "paper_laser", "lane": 1, "height": "high"}

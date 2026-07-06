@@ -31,6 +31,14 @@ func _initialize() -> void:
 	player.land()
 	if not _check(player.jump_count == 0, "landing resets jump count"):
 		return
+	player._physics_process(0.016)
+	if not _check(player.position.y == player.ground_y, "player stays on ground baseline"):
+		return
+	player.try_jump()
+	player._physics_process(0.016)
+	if not _check(player.position.y < player.ground_y, "jump offset is relative to baseline"):
+		return
+	player.land()
 	player.set_ducking(true)
 	if not _check(player.is_ducking, "ducking starts"):
 		return

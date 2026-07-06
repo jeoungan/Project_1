@@ -10,6 +10,7 @@ const PROJECTILE_SCENE := preload("res://scenes/boss/BossProjectile.tscn")
 @onready var boss: Node = %HomeroomBoss
 @onready var projectile_root: Node2D = %ProjectileRoot
 @onready var status_label: Label = %StatusLabel
+@onready var meter: Node = %DesireMeter
 
 func _ready() -> void:
 	player.attacked.connect(_on_player_attacked)
@@ -21,6 +22,7 @@ func _ready() -> void:
 		boss_defeated.emit()
 	)
 	boss.pattern_requested.connect(_spawn_pattern)
+	meter.add_value(meter.max_value)
 	var timer := Timer.new()
 	timer.wait_time = boss.pattern_seconds
 	timer.autostart = true
@@ -31,8 +33,12 @@ func _ready() -> void:
 
 func _on_player_attacked() -> void:
 	if player.position.distance_to(boss.position) < 190.0:
-		boss.take_damage(10)
-		status_label.text = "귀가 본능 공격"
+		if meter.consume_special():
+			boss.take_damage(40)
+			status_label.text = "귀가 본능 폭발"
+		else:
+			boss.take_damage(10)
+			status_label.text = "귀가 본능 공격"
 
 func _spawn_pattern(pattern_name: String) -> void:
 	status_label.text = pattern_name

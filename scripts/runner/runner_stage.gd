@@ -114,8 +114,29 @@ func _on_player_area_entered(area: Area2D) -> void:
 			player.collect_desire(obstacle.desire_value)
 			obstacle.queue_free()
 			return
+		if _player_avoids_obstacle(obstacle):
+			obstacle.queue_free()
+			return
 		if meter.is_bursting and obstacle.kind in ["desk", "falling_tile"]:
 			obstacle.queue_free()
 			return
 		player.apply_hit(obstacle.damage)
 		obstacle.queue_free()
+
+func _player_avoids_obstacle(obstacle: Node) -> bool:
+	if player == null:
+		_bind_nodes()
+	if player == null:
+		return false
+	var height_tag := str(obstacle.get("height_tag"))
+	match height_tag:
+		"ground":
+			return player.has_method("is_airborne") and player.is_airborne()
+		"low":
+			return bool(player.get("is_ducking"))
+		"high":
+			return bool(player.get("is_ducking"))
+		"item":
+			return false
+		_:
+			return false

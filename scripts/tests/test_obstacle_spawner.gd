@@ -13,6 +13,12 @@ func _check(condition: bool, message: String) -> bool:
 func _initialize() -> void:
 	var spawner = load("res://scripts/runner/obstacle_spawner.gd").new()
 	root.add_child(spawner)
+	var default_key_desire := 0
+	for pattern in spawner.patterns:
+		if pattern.get("kind", "") == "key":
+			default_key_desire += int(pattern.get("desire", 0))
+	if not _check(default_key_desire >= 100, "default patterns can trigger burst"):
+		return
 	spawner.patterns = [
 		{"distance": 10.0, "kind": "desk", "lane": 1, "height": "ground"},
 		{"distance": 20.0, "kind": "paper_laser", "lane": 0, "height": "high"}

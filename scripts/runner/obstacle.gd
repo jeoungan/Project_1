@@ -15,6 +15,7 @@ func configure(definition: Dictionary, lane_x: float, start_y: float) -> void:
 	lane = int(definition.get("lane", 1))
 	height_tag = str(definition.get("height", "ground"))
 	is_collectible = kind == "key"
+	desire_value = int(definition.get("desire", desire_value))
 	position = Vector2(lane_x, start_y)
 	_apply_visual()
 
