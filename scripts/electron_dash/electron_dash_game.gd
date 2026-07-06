@@ -10,6 +10,7 @@ const Rules := preload("res://scripts/electron_dash/electron_dash_rules.gd")
 @export var jump_velocity: float = 8.8
 @export var gravity: float = 24.0
 @export var lane_turn_speed: float = 14.0
+@export var auto_restart_seconds: float = 1.1
 
 var player_lane: int = 0
 var target_angle: float = 0.0
@@ -21,6 +22,7 @@ var distance: float = 0.0
 var score: int = 0
 var next_segment_index: int = 0
 var segments: Array = []
+var restart_countdown: float = 0.0
 
 @onready var tube_root: Node3D = %TubeRoot
 @onready var player_pivot: Node3D = %PlayerPivot
@@ -39,7 +41,7 @@ func reset_game() -> void:
 		child.queue_free()
 	segments.clear()
 	player_lane = 0
-	target_angle = Rules.lane_angle(player_lane, lane_count)
+	target_angle = _roll_for_lane(player_lane)
 	visual_angle = target_angle
 	jump_height = 0.0
 	vertical_velocity = 0.0
@@ -47,6 +49,7 @@ func reset_game() -> void:
 	score = 0
 	next_segment_index = 0
 	is_alive = true
+	restart_countdown = 0.0
 	overlay_label.visible = false
 	for i in range(visible_segments):
 		_spawn_segment(-float(i) * segment_depth)
@@ -65,6 +68,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if not is_alive:
+		restart_countdown -= delta
+		if restart_countdown <= 0.0:
+			reset_game()
 		return
 	var speed: float = Rules.speed_for_distance(distance)
 	distance += speed * delta
@@ -76,7 +82,7 @@ func _process(delta: float) -> void:
 
 func _change_lane(delta_lane: int) -> void:
 	player_lane = Rules.wrap_lane(player_lane, delta_lane, lane_count)
-	target_angle = Rules.lane_angle(player_lane, lane_count)
+	target_angle = _roll_for_lane(player_lane)
 
 func _jump() -> void:
 	if jump_height <= 0.02:
@@ -92,9 +98,10 @@ func _update_jump(delta: float) -> void:
 func _update_player_transform(delta: float) -> void:
 	var blend: float = min(1.0, lane_turn_speed * delta)
 	visual_angle = lerp_angle(visual_angle, target_angle, blend)
-	player_pivot.rotation.z = visual_angle
+	tube_root.rotation.z = visual_angle
+	player_pivot.rotation.z = 0.0
 	player_pivot.position = Vector3(0.0, 0.0, player_z)
-	player_visual.position = Vector3(tunnel_radius - 0.55 - jump_height, 0.0, 0.0)
+	player_visual.position = Vector3(0.0, -tunnel_radius + 0.55 + jump_height, 0.0)
 
 func _scroll_segments(speed: float, delta: float) -> void:
 	var farthest_z: float = _farthest_segment_z()
@@ -122,6 +129,7 @@ func _farthest_segment_z() -> float:
 
 func _game_over() -> void:
 	is_alive = false
+	restart_countdown = auto_restart_seconds
 	overlay_label.text = "SYSTEM FAILURE\nSCORE %d\nPRESS R TO RESTART" % score
 	overlay_label.visible = true
 
@@ -180,10 +188,18 @@ func _make_laser(lane: int) -> MeshInstance3D:
 	return laser
 
 func _place_on_tunnel(node: Node3D, lane: int, radius: float) -> void:
-	var angle: float = Rules.lane_angle(lane, lane_count)
+	var angle: float = _visual_lane_angle(lane)
 	var normal := Vector3(cos(angle), sin(angle), 0.0)
 	var tangent := Vector3(-sin(angle), cos(angle), 0.0)
 	node.transform = Transform3D(Basis(tangent, normal, Vector3(0.0, 0.0, 1.0)), normal * radius)
+
+func _visual_lane_angle(lane: int) -> float:
+	if lane_count <= 1:
+		return PI * 1.5
+	return PI + PI * float(lane) / float(lane_count - 1)
+
+func _roll_for_lane(lane: int) -> float:
+	return PI * 1.5 - _visual_lane_angle(lane)
 
 func _build_player_mesh() -> void:
 	var mesh := CapsuleMesh.new()
