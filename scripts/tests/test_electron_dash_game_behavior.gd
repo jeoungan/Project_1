@@ -35,6 +35,27 @@ func _initialize() -> void:
 	if not _check(abs((second_angle - first_angle) - (TAU / float(game.lane_count))) < 0.001, "panels use five-way spacing"):
 		return
 
+	game.reset_game()
+	game.invincible_timer = 2.0
+	game._process(1.25)
+	if not _check(game.score == 1, "score counts survival seconds"):
+		return
+
+	game.reset_game()
+	game._collect_heart()
+	if not _check(game.extra_lives == 1, "heart pickup grants an extra life"):
+		return
+	game._handle_crash()
+	if not _check(game.is_alive, "extra life respawns instead of ending the run"):
+		return
+	if not _check(game.extra_lives == 0, "respawn consumes one extra life"):
+		return
+	if not _check(game.invincible_timer > 0.0, "respawn grants brief invincibility"):
+		return
+
+	if not _check(game.shadow_visual != null and game.shadow_visual.visible, "player shadow is visible for orientation"):
+		return
+
 	game._game_over()
 	if not _check(not game.is_alive, "game enters fail state first"):
 		return
