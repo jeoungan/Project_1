@@ -11,26 +11,16 @@ func _check(condition: bool, message: String) -> bool:
 	return true
 
 func _initialize() -> void:
-	var scene_paths := [
-		"res://scenes/main/GameRoot.tscn",
-		"res://scenes/cutscenes/CutscenePlayer.tscn",
-		"res://scenes/runner/RunnerStage.tscn",
-		"res://scenes/runner/RunnerPlayer.tscn",
-		"res://scenes/runner/Obstacle.tscn",
-		"res://scenes/ui/HUD.tscn",
-		"res://scenes/boss/BossArena.tscn",
-		"res://scenes/boss/BossPlayer.tscn",
-		"res://scenes/boss/HomeroomBoss.tscn",
-		"res://scenes/boss/BossProjectile.tscn"
-	]
-	for path in scene_paths:
-		var packed: PackedScene = load(path)
-		if not _check(packed != null, "%s loads" % path):
-			return
-		var instance := packed.instantiate()
-		if not _check(instance != null, "%s instantiates" % path):
-			return
-		instance.free()
-
+	var packed: PackedScene = load("res://scenes/main/ElectronDashGame.tscn")
+	if not _check(packed != null, "main scene loads"):
+		return
+	var instance := packed.instantiate()
+	if not _check(instance != null, "main scene instantiates"):
+		return
+	if not _check(instance.get_script() != null, "main scene script is attached"):
+		return
+	if not _check(instance.has_method("reset_game"), "main scene exposes reset_game"):
+		return
+	instance.free()
 	print("test_scene_loads passed")
 	quit(0)
