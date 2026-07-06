@@ -26,9 +26,9 @@ func _draw() -> void:
 	var glow := Color(0.18 + burst_strength * 0.35, 0.45, 0.75 + burst_strength * 0.2, 0.4)
 	for i in range(12):
 		var t := float(i) / 11.0
-		var y := lerp(horizon_y, floor_y, t)
-		var width := lerp(160.0, 1150.0, t)
-		var x_shift := sin(t * 4.0 + scroll_offset * 0.02) * 24.0 + twist * 420.0 * t
+		var y: float = lerp(horizon_y, floor_y, t)
+		var width: float = lerp(160.0, 1150.0, t)
+		var x_shift: float = sin(t * 4.0 + scroll_offset * 0.02) * 24.0 + twist * 420.0 * t
 		draw_line(Vector2(-width * 0.5 + x_shift, y), Vector2(width * 0.5 + x_shift, y), glow, 3.0)
 	for lane_x in lane_positions:
 		draw_line(Vector2(lane_x * 0.2, horizon_y), Vector2(lane_x, floor_y), Color(0.45, 0.85, 1.0, 0.55), 4.0)
