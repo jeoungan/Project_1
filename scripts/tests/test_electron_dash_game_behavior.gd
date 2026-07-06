@@ -16,6 +16,9 @@ func _initialize() -> void:
 	root.add_child(game)
 	await process_frame
 
+	if not _check(game.lane_count == 5, "game uses five panels"):
+		return
+
 	game._change_lane(1)
 	game._update_player_transform(0.2)
 	var player_pivot: Node3D = game.get_node("%PlayerPivot")
@@ -26,10 +29,10 @@ func _initialize() -> void:
 		return
 
 	var first_angle: float = game._visual_lane_angle(0)
-	var last_angle: float = game._visual_lane_angle(game.lane_count - 1)
-	if not _check(first_angle >= PI - 0.001, "first panel starts on lower half"):
+	var second_angle: float = game._visual_lane_angle(1)
+	if not _check(is_equal_approx(first_angle, 0.0), "first panel uses canonical tube angle"):
 		return
-	if not _check(last_angle <= TAU + 0.001, "last panel stays on lower half"):
+	if not _check(abs((second_angle - first_angle) - (TAU / float(game.lane_count))) < 0.001, "panels use five-way spacing"):
 		return
 
 	game._game_over()

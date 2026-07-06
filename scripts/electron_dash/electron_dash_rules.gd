@@ -1,7 +1,7 @@
 class_name ElectronDashRules
 extends RefCounted
 
-const LANE_COUNT: int = 12
+const LANE_COUNT: int = 5
 const SAFE_START_SEGMENTS: int = 6
 
 static func wrap_lane(lane: int, delta: int, lane_count: int = LANE_COUNT) -> int:
@@ -43,7 +43,7 @@ static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary
 		lasers.append(false)
 
 	if index >= SAFE_START_SEGMENTS:
-		var gap_lane := positive_mod(index * 5 + 2, lane_count)
+		var gap_lane := positive_mod(index * 2 + 2, lane_count)
 		floors[gap_lane] = false
 		if index % 4 == 0:
 			floors[wrap_lane(gap_lane, 1, lane_count)] = false

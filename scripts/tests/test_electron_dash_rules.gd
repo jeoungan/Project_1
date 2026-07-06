@@ -13,9 +13,23 @@ func _check(condition: bool, message: String) -> bool:
 	return true
 
 func _initialize() -> void:
+	if not _check(Rules.LANE_COUNT == 5, "default panel count is five"):
+		return
+
 	if not _check(Rules.wrap_lane(0, -1, 12) == 11, "left wraps to final lane"):
 		return
 	if not _check(Rules.wrap_lane(11, 1, 12) == 0, "right wraps to first lane"):
+		return
+
+	var default_segment := Rules.make_segment(0)
+	if not _check(default_segment["floors"].size() == 5, "default segment has five floor panels"):
+		return
+	if not _check(default_segment["lasers"].size() == 5, "default segment has five laser lanes"):
+		return
+
+	var five_lane_gap_a: Array = Rules.make_segment(6, 5)["floors"]
+	var five_lane_gap_b: Array = Rules.make_segment(7, 5)["floors"]
+	if not _check(five_lane_gap_a.find(false) != five_lane_gap_b.find(false), "five-panel gaps vary by segment"):
 		return
 
 	var safe_segment := Rules.make_segment(0, 12)

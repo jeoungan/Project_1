@@ -194,9 +194,7 @@ func _place_on_tunnel(node: Node3D, lane: int, radius: float) -> void:
 	node.transform = Transform3D(Basis(tangent, normal, Vector3(0.0, 0.0, 1.0)), normal * radius)
 
 func _visual_lane_angle(lane: int) -> float:
-	if lane_count <= 1:
-		return PI * 1.5
-	return PI + PI * float(lane) / float(lane_count - 1)
+	return Rules.lane_angle(lane, lane_count)
 
 func _roll_for_lane(lane: int) -> float:
 	return PI * 1.5 - _visual_lane_angle(lane)
