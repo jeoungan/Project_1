@@ -4,12 +4,12 @@ const Rules := preload("res://scripts/electron_dash/electron_dash_rules.gd")
 
 @export var lane_count: int = Rules.LANE_COUNT
 @export var tunnel_radius: float = 4.0
-@export var segment_depth: float = 2.2
-@export var visible_segments: int = 34
+@export var segment_depth: float = 3.6
+@export var visible_segments: int = 32
 @export var player_z: float = 3.0
-@export var jump_velocity: float = 8.8
-@export var gravity: float = 24.0
-@export var lane_turn_speed: float = 14.0
+@export var jump_velocity: float = 10.4
+@export var gravity: float = 20.0
+@export var lane_turn_speed: float = 8.0
 @export var auto_restart_seconds: float = 1.1
 @export var respawn_invincible_seconds: float = 2.0
 @export var max_extra_lives: int = 2
@@ -67,7 +67,7 @@ func reset_game() -> void:
 	is_alive = true
 	restart_countdown = 0.0
 	overlay_label.visible = false
-	hint_label.visible = true
+	hint_label.visible = false
 	for i in range(visible_segments):
 		_spawn_segment(-float(i) * segment_depth)
 	_update_player_transform(0.0)
@@ -85,9 +85,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if not is_alive:
-		restart_countdown -= delta
-		if restart_countdown <= 0.0:
-			reset_game()
 		return
 	var speed: float = Rules.speed_for_distance(distance)
 	survival_time += delta
@@ -189,7 +186,7 @@ func _game_over() -> void:
 	is_alive = false
 	best_score = max(best_score, score)
 	restart_countdown = auto_restart_seconds
-	overlay_label.text = "VOID\nTIME %d\nAUTO RESTART" % score
+	overlay_label.text = "VOID\nTIME %d\nPRESS R TO RESTART" % score
 	overlay_label.visible = true
 
 func _spawn_segment(z_position: float) -> void:
@@ -228,7 +225,7 @@ func _make_tunnel_grid() -> Node3D:
 	for lane in range(visual_grid_lanes):
 		var angle := TAU * float(lane) / float(visual_grid_lanes)
 		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.035, 0.035, segment_depth * 0.94)
+		mesh.size = Vector3(0.035, 0.035, segment_depth * 0.66)
 		mesh.material = _make_emissive_material(color, 1.15)
 		var rail := MeshInstance3D.new()
 		rail.mesh = mesh
@@ -238,8 +235,7 @@ func _make_tunnel_grid() -> Node3D:
 
 func _make_tile(lane: int, color: Color, is_unstable: bool = false) -> MeshInstance3D:
 	var mesh := BoxMesh.new()
-	var panel_width: float = max(1.55, TAU * tunnel_radius / float(lane_count) * 0.48)
-	mesh.size = Vector3(panel_width, 0.12, segment_depth * (0.74 if is_unstable else 0.82))
+	mesh.size = Vector3(_panel_width(0.64), 0.12, _tile_depth(is_unstable))
 	mesh.material = _make_emissive_material(color, 1.8 if is_unstable else 1.35)
 	var tile := MeshInstance3D.new()
 	tile.mesh = mesh
@@ -248,7 +244,7 @@ func _make_tile(lane: int, color: Color, is_unstable: bool = false) -> MeshInsta
 
 func _make_laser(lane: int) -> Node3D:
 	var root := Node3D.new()
-	var panel_width: float = max(1.55, TAU * tunnel_radius / float(lane_count) * 0.42)
+	var panel_width: float = _panel_width(0.56)
 	for z_offset in [-0.22, 0.22]:
 		var mesh := BoxMesh.new()
 		mesh.size = Vector3(panel_width, 0.12, 0.12)
@@ -284,6 +280,12 @@ func _visual_lane_angle(lane: int) -> float:
 
 func _roll_for_lane(lane: int) -> float:
 	return PI * 1.5 - _visual_lane_angle(lane)
+
+func _panel_width(scale_factor: float) -> float:
+	return max(2.2, TAU * tunnel_radius / float(lane_count) * scale_factor)
+
+func _tile_depth(is_unstable: bool) -> float:
+	return segment_depth * (0.54 if is_unstable else 0.60)
 
 func _configure_world() -> void:
 	var environment := Environment.new()
@@ -354,4 +356,4 @@ func _update_hud() -> void:
 	score_label.text = "TIME %03d   BEST %03d" % [score, best_score]
 	speed_label.text = "SPEED %.1f   HEARTS %d" % [Rules.speed_for_distance(distance), extra_lives]
 	hint_label.text = "A/D or Arrows   W/Up: jump   R: restart"
-	hint_label.visible = survival_time < 4.0
+	hint_label.visible = false

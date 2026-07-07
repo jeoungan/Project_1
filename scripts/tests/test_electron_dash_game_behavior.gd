@@ -18,6 +18,15 @@ func _initialize() -> void:
 
 	if not _check(game.lane_count == 5, "game uses five panels"):
 		return
+	if not _check(game.segment_depth >= 3.2, "rows are spaced far enough to read gaps"):
+		return
+	if not _check(game._tile_depth(false) <= game.segment_depth * 0.65, "jump gaps stay visually wide"):
+		return
+	if not _check(game.lane_turn_speed <= 9.0, "lane rotation is eased instead of snapping"):
+		return
+	var hint_label: Label = game.get_node("%HintLabel")
+	if not _check(not hint_label.visible, "bottom key hint stays hidden"):
+		return
 
 	game._change_lane(1)
 	game._update_player_transform(0.2)
@@ -59,8 +68,11 @@ func _initialize() -> void:
 	game._game_over()
 	if not _check(not game.is_alive, "game enters fail state first"):
 		return
+	var overlay_label: Label = game.get_node("%OverlayLabel")
+	if not _check(overlay_label.text.contains("PRESS R"), "game over waits for manual restart"):
+		return
 	game._process(game.auto_restart_seconds + 0.1)
-	if not _check(game.is_alive, "game auto-restarts instead of staying frozen"):
+	if not _check(not game.is_alive, "game stays stopped until restart input"):
 		return
 
 	game.free()
