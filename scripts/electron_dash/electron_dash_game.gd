@@ -32,6 +32,8 @@ var invincible_timer: float = 0.0
 var status_message_timer: float = 0.0
 var jump_buffer_timer: float = 0.0
 var lane_change_grace_timer: float = 0.0
+var map_seed: int = 0
+var map_run_counter: int = 0
 var next_segment_index: int = 0
 var segments: Array = []
 var restart_countdown: float = 0.0
@@ -64,6 +66,8 @@ func reset_game() -> void:
 	distance = 0.0
 	survival_time = 0.0
 	score = 0
+	map_run_counter += 1
+	map_seed = _next_map_seed()
 	invincible_timer = 0.0
 	status_message_timer = 0.0
 	jump_buffer_timer = 0.0
@@ -159,7 +163,7 @@ func _scroll_segments(speed: float, delta: float) -> void:
 		if root.position.z > player_z + segment_depth * 4.0:
 			root.position.z = farthest_z - segment_depth
 			farthest_z = root.position.z
-			segment["data"] = Rules.make_segment(next_segment_index, lane_count)
+			segment["data"] = Rules.make_segment(next_segment_index, lane_count, map_seed)
 			segment["checked"] = false
 			next_segment_index += 1
 			_rebuild_segment(segment)
@@ -194,7 +198,7 @@ func _spawn_segment(z_position: float) -> void:
 	root.name = "Segment%03d" % next_segment_index
 	root.position.z = z_position
 	tube_root.add_child(root)
-	var data: Dictionary = Rules.make_segment(next_segment_index, lane_count)
+	var data: Dictionary = Rules.make_segment(next_segment_index, lane_count, map_seed)
 	var segment: Dictionary = {
 		"root": root,
 		"data": data,
@@ -293,35 +297,17 @@ func _configure_world() -> void:
 	environment.glow_strength = 1.0
 	world_environment.environment = environment
 
+func _next_map_seed() -> int:
+	var seed: int = int((Time.get_ticks_usec() + map_run_counter * 7919) % 2147483647)
+	return max(1, seed)
+
 func _build_player_mesh() -> void:
 	for child in player_visual.get_children():
 		child.free()
-	var mesh := CapsuleMesh.new()
-	mesh.radius = 0.24
-	mesh.height = 0.82
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(0.58, 0.72, 0.58)
 	mesh.material = _make_emissive_material(Color(0.16, 0.55, 1.0, 1.0), 1.25)
 	player_visual.mesh = mesh
-
-	var visor_mesh := SphereMesh.new()
-	visor_mesh.radius = 0.13
-	visor_mesh.height = 0.16
-	visor_mesh.material = _make_emissive_material(Color(1.0, 0.45, 0.06, 1.0), 1.8)
-	var visor := MeshInstance3D.new()
-	visor.mesh = visor_mesh
-	visor.position = Vector3(0.0, 0.12, 0.24)
-	visor.scale = Vector3(1.35, 0.72, 0.5)
-	player_visual.add_child(visor)
-
-	for side in [-1.0, 1.0]:
-		var limb_mesh := CapsuleMesh.new()
-		limb_mesh.radius = 0.055
-		limb_mesh.height = 0.38
-		limb_mesh.material = _make_emissive_material(Color(0.75, 0.92, 1.0, 1.0), 0.55)
-		var limb := MeshInstance3D.new()
-		limb.mesh = limb_mesh
-		limb.position = Vector3(side * 0.24, -0.02, 0.0)
-		limb.rotation.z = side * 0.38
-		player_visual.add_child(limb)
 
 	if shadow_visual == null:
 		var shadow_mesh := CylinderMesh.new()

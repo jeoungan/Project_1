@@ -18,6 +18,10 @@ func _initialize() -> void:
 
 	if not _check(game.lane_count == 5, "game uses five panels"):
 		return
+	var first_seed: int = game.map_seed
+	game.reset_game()
+	if not _check(game.map_seed != first_seed, "each run gets a fresh map seed"):
+		return
 	if not _check(game.segment_depth >= 3.2, "rows are spaced far enough to read gaps"):
 		return
 	if not _check(game._tile_depth(false) >= game.segment_depth * 1.02, "ordinary road tiles overlap into a continuous path"):
@@ -32,6 +36,8 @@ func _initialize() -> void:
 		return
 	var hint_label: Label = game.get_node("%HintLabel")
 	if not _check(not hint_label.visible, "bottom key hint stays hidden"):
+		return
+	if not _check(game.player_visual.mesh is BoxMesh, "player is a simple cube"):
 		return
 
 	game._change_lane(1)

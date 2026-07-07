@@ -3,6 +3,9 @@ extends RefCounted
 
 const LANE_COUNT: int = 5
 const SAFE_START_SEGMENTS: int = 6
+const LONG_GAP_FIRST_SEGMENT: int = SAFE_START_SEGMENTS + 4
+const LONG_GAP_ROWS: int = 7
+const LONG_GAP_CYCLE: int = 14
 
 static func wrap_lane(lane: int, delta: int, lane_count: int = LANE_COUNT) -> int:
 	var next_lane := (lane + delta) % lane_count
@@ -43,7 +46,7 @@ static func should_crash(segment: Dictionary, lane: int, is_grounded: bool, _is_
 static func speed_for_distance(distance: float) -> float:
 	return 12.0 + min(distance / 320.0, 10.0)
 
-static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary:
+static func make_segment(index: int, lane_count: int = LANE_COUNT, map_seed: int = 0) -> Dictionary:
 	var floors: Array = []
 	var lasers: Array = []
 	var unstable: Array = []
@@ -53,18 +56,13 @@ static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary
 		unstable.append(false)
 
 	if index >= SAFE_START_SEGMENTS:
-		if index % 5 == 0:
-			var jump_index: int = int(index / 5)
-			var gap_lane := positive_mod(jump_index * 2 + 1, lane_count)
+		var gap_lane: int = long_gap_lane_for_segment(index, lane_count, map_seed)
+		if gap_lane >= 0:
 			floors[gap_lane] = false
-			if index % 10 == 0:
+			if index % (LONG_GAP_CYCLE * 2) == 0:
 				floors[wrap_lane(gap_lane, 1, lane_count)] = false
-		if index % 7 == 0:
-			lasers[positive_mod(index * 3 + 1, lane_count)] = true
-		if index % 13 == 0:
-			lasers[positive_mod(index * 3 + 5, lane_count)] = true
-		if index % 9 == 0:
-			var unstable_lane := positive_mod(index * 4 + 1, lane_count)
+		if index % 9 == 0 and gap_lane < 0:
+			var unstable_lane := positive_mod(map_seed * 11 + index * 4 + 1, lane_count)
 			if bool(floors[unstable_lane]) and not bool(lasers[unstable_lane]):
 				unstable[unstable_lane] = true
 		if not _arrays_have_safe_lane(floors, lasers, unstable, lane_count):
@@ -79,6 +77,16 @@ static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary
 		"lasers": lasers,
 		"unstable": unstable
 	}
+
+static func long_gap_lane_for_segment(index: int, lane_count: int = LANE_COUNT, map_seed: int = 0) -> int:
+	if index < LONG_GAP_FIRST_SEGMENT:
+		return -1
+	var relative_index: int = index - LONG_GAP_FIRST_SEGMENT
+	var group: int = int(relative_index / LONG_GAP_CYCLE)
+	var group_start: int = LONG_GAP_FIRST_SEGMENT + group * LONG_GAP_CYCLE
+	if index >= group_start and index < group_start + LONG_GAP_ROWS:
+		return positive_mod(map_seed * 17 + group * 3 + 1, lane_count)
+	return -1
 
 static func segment_has_safe_lane(segment: Dictionary, lane_count: int = LANE_COUNT) -> bool:
 	for lane in range(lane_count):
