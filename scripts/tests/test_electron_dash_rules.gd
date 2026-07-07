@@ -28,6 +28,10 @@ func _initialize() -> void:
 		return
 	if not _check(default_segment["unstable"].size() == 5, "default segment has five unstable flags"):
 		return
+	if not _check(default_segment["movers"].size() == 5, "default segment has five moving obstacle flags"):
+		return
+	if not _check(default_segment["jump_markers"].size() == 5, "default segment has five jump warning flags"):
+		return
 	if not _check(not default_segment.has("hearts"), "segments do not spawn collectibles"):
 		return
 
@@ -45,6 +49,8 @@ func _initialize() -> void:
 			long_gap_lane = lane
 	if not _check(long_gap_lane >= 0, "jump-gap hazards span multiple rows"):
 		return
+	if not _check(Rules.segment_has_jump_marker(Rules.make_segment(9, 5, 1001), long_gap_lane), "jump warning appears before long gap"):
+		return
 
 	for index in range(Rules.SAFE_START_SEGMENTS, Rules.SAFE_START_SEGMENTS + 30):
 		var generated_segment: Dictionary = Rules.make_segment(index, 5, 1001)
@@ -52,8 +58,14 @@ func _initialize() -> void:
 			return
 		if not _check(generated_segment["lasers"].find(true) == -1, "generated segments do not use laser blockers"):
 			return
+		if not _check(generated_segment["unstable"].find(true) == -1, "generated segments do not use vanishing tiles"):
+			return
 		if not _check(Rules.segment_has_safe_lane(generated_segment, 5), "generated segment remains avoidable"):
 			return
+
+	var mover_segment: Dictionary = Rules.make_segment(22, 5, 1001)
+	if not _check(mover_segment["movers"].find(true) >= 0, "moving rectangular obstacles appear on the road"):
+		return
 
 	var safe_segment := Rules.make_segment(0, 12)
 	for lane in range(12):
@@ -63,13 +75,24 @@ func _initialize() -> void:
 	var danger_segment := {
 		"floors": [true, false, true],
 		"lasers": [false, true, false],
-		"unstable": [false, false, true]
+		"unstable": [false, false, true],
+		"movers": [false, false, false],
+		"jump_markers": [false, false, false]
 	}
 	if not _check(Rules.should_crash(danger_segment, 1, true, false), "grounded player crashes on missing floor"):
 		return
 	if not _check(Rules.should_crash(danger_segment, 1, false, false), "laser still hits while airborne if present"):
 		return
 	if not _check(Rules.should_crash(danger_segment, 2, true, false), "unstable panels collapse under grounded player"):
+		return
+	var mover_danger_segment := {
+		"floors": [true, true, true],
+		"lasers": [false, false, false],
+		"unstable": [false, false, false],
+		"movers": [false, true, false],
+		"jump_markers": [false, false, false]
+	}
+	if not _check(Rules.should_crash(mover_danger_segment, 1, true, false), "moving obstacle hits its lane"):
 		return
 	if not _check(Rules.speed_for_distance(1000.0) > Rules.speed_for_distance(0.0), "speed rises with distance"):
 		return

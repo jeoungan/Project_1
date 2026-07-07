@@ -17,6 +17,7 @@ const Rules := preload("res://scripts/electron_dash/electron_dash_rules.gd")
 @export var jump_buffer_seconds: float = 0.14
 @export var jump_ready_height: float = 0.08
 @export var lane_change_grace_seconds: float = 0.22
+@export var mover_phase_speed: float = 2.2
 
 var player_lane: int = 0
 var target_angle: float = 0.0
@@ -28,6 +29,7 @@ var distance: float = 0.0
 var score: int = 0
 var best_score: int = 0
 var survival_time: float = 0.0
+var world_time: float = 0.0
 var invincible_timer: float = 0.0
 var status_message_timer: float = 0.0
 var jump_buffer_timer: float = 0.0
@@ -96,6 +98,7 @@ func _process(delta: float) -> void:
 	if not is_alive:
 		return
 	var speed: float = Rules.speed_for_distance(distance)
+	world_time += delta
 	survival_time += delta
 	distance += speed * delta
 	score = int(survival_time)
@@ -112,6 +115,7 @@ func _process(delta: float) -> void:
 	_update_jump(delta)
 	_try_consume_jump()
 	_update_player_transform(delta)
+	_animate_movers()
 	_scroll_segments(speed, delta)
 	_update_hud()
 
@@ -218,17 +222,20 @@ func _rebuild_segment(segment: Dictionary) -> void:
 		if Rules.segment_has_floor(data, lane):
 			var is_unstable := Rules.segment_has_unstable(data, lane)
 			root.add_child(_make_tile(lane, _tile_color(is_unstable), is_unstable))
+			if Rules.segment_has_jump_marker(data, lane):
+				root.add_child(_make_jump_marker(lane))
 		if Rules.segment_has_laser(data, lane):
 			root.add_child(_make_laser(lane))
+		if Rules.segment_has_mover(data, lane):
+			root.add_child(_make_moving_obstacle(lane))
 
 func _make_tunnel_grid() -> Node3D:
 	var grid := Node3D.new()
-	var color := Color(0.0, 0.65, 1.0, 1.0)
 	for lane in range(visual_grid_lanes):
 		var angle := TAU * float(lane) / float(visual_grid_lanes)
 		var mesh := BoxMesh.new()
-		mesh.size = Vector3(0.035, 0.035, segment_depth * 0.66)
-		mesh.material = _make_emissive_material(color, 1.15)
+		mesh.size = Vector3(0.045, 0.045, segment_depth * 1.12)
+		mesh.material = _make_emissive_material(_edge_color(), 1.45)
 		var rail := MeshInstance3D.new()
 		rail.mesh = mesh
 		_place_at_angle(rail, angle, tunnel_radius + 0.03)
@@ -237,12 +244,48 @@ func _make_tunnel_grid() -> Node3D:
 
 func _make_tile(lane: int, color: Color, is_unstable: bool = false) -> MeshInstance3D:
 	var mesh := BoxMesh.new()
-	mesh.size = Vector3(_panel_width(0.64), 0.12, _tile_depth(is_unstable))
+	mesh.size = Vector3(_panel_width(1.0), 0.10, _tile_depth(is_unstable))
 	mesh.material = _make_emissive_material(color, 1.8 if is_unstable else 1.35)
 	var tile := MeshInstance3D.new()
 	tile.mesh = mesh
 	_place_on_tunnel(tile, lane, tunnel_radius)
 	return tile
+
+func _make_jump_marker(lane: int) -> MeshInstance3D:
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(_panel_width(0.86), 0.06, segment_depth * 0.22)
+	mesh.material = _make_emissive_material(_jump_marker_color(), 3.1)
+	var marker := MeshInstance3D.new()
+	marker.mesh = mesh
+	_place_on_tunnel(marker, lane, tunnel_radius - 0.06)
+	marker.position.z += segment_depth * 0.32
+	return marker
+
+func _make_moving_obstacle(lane: int) -> Node3D:
+	var root := Node3D.new()
+	root.name = "MoverLane%d" % lane
+	root.set_meta("lane", lane)
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(_panel_width(0.34), 0.32, segment_depth * 0.26)
+	mesh.material = _make_emissive_material(Color(1.0, 0.1, 0.12, 1.0), 2.7)
+	var mover := MeshInstance3D.new()
+	mover.mesh = mesh
+	_position_mover_mesh(mover, lane)
+	root.add_child(mover)
+	return root
+
+func _animate_movers() -> void:
+	for segment in segments:
+		var segment_root := segment["root"] as Node3D
+		for child in segment_root.get_children():
+			if child.has_meta("lane") and child.get_child_count() > 0:
+				var mover := child.get_child(0) as MeshInstance3D
+				if mover != null:
+					_position_mover_mesh(mover, int(child.get_meta("lane")))
+
+func _position_mover_mesh(mover: MeshInstance3D, lane: int) -> void:
+	_place_on_tunnel(mover, lane, tunnel_radius - 0.28)
+	mover.position += _lane_tangent(lane) * _mover_offset(lane)
 
 func _make_laser(lane: int) -> Node3D:
 	var root := Node3D.new()
@@ -264,6 +307,10 @@ func _place_on_tunnel(node: Node3D, lane: int, radius: float) -> void:
 	var angle: float = _visual_lane_angle(lane)
 	_place_at_angle(node, angle, radius)
 
+func _lane_tangent(lane: int) -> Vector3:
+	var angle: float = _visual_lane_angle(lane)
+	return Vector3(-sin(angle), cos(angle), 0.0)
+
 func _place_at_angle(node: Node3D, angle: float, radius: float) -> void:
 	var normal := Vector3(cos(angle), sin(angle), 0.0)
 	var tangent := Vector3(-sin(angle), cos(angle), 0.0)
@@ -276,13 +323,25 @@ func _roll_for_lane(lane: int) -> float:
 	return PI * 1.5 - _visual_lane_angle(lane)
 
 func _panel_width(scale_factor: float) -> float:
-	return max(2.2, TAU * tunnel_radius / float(lane_count) * scale_factor)
+	return _lane_surface_width() * scale_factor
+
+func _lane_surface_width() -> float:
+	return TAU * tunnel_radius / float(lane_count) * 0.98
 
 func _tile_depth(_is_unstable: bool) -> float:
 	return segment_depth * 1.08
 
 func _tile_color(is_unstable: bool) -> Color:
 	return Color(0.035, 0.10, 0.24, 1.0) if is_unstable else Color(0.012, 0.045, 0.14, 1.0)
+
+func _edge_color() -> Color:
+	return Color(0.0, 0.82, 1.0, 1.0)
+
+func _jump_marker_color() -> Color:
+	return Color(0.1, 1.0, 0.95, 1.0)
+
+func _mover_offset(lane: int) -> float:
+	return sin(world_time * mover_phase_speed + float(lane) * 0.8) * _lane_surface_width() * 0.26
 
 func _configure_world() -> void:
 	var environment := Environment.new()
@@ -305,9 +364,10 @@ func _build_player_mesh() -> void:
 	for child in player_visual.get_children():
 		child.free()
 	var mesh := BoxMesh.new()
-	mesh.size = Vector3(0.58, 0.72, 0.58)
+	mesh.size = Vector3(0.62, 0.62, 0.62)
 	mesh.material = _make_emissive_material(Color(0.16, 0.55, 1.0, 1.0), 1.25)
 	player_visual.mesh = mesh
+	player_visual.rotation.z = deg_to_rad(12.0)
 
 	if shadow_visual == null:
 		var shadow_mesh := CylinderMesh.new()

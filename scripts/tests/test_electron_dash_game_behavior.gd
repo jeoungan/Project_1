@@ -26,6 +26,12 @@ func _initialize() -> void:
 		return
 	if not _check(game._tile_depth(false) >= game.segment_depth * 1.02, "ordinary road tiles overlap into a continuous path"):
 		return
+	if not _check(game._panel_width(1.0) >= game._lane_surface_width() * 0.96, "each road face fills the whole lane surface"):
+		return
+	if not _check(game._edge_color().g > 0.6 and game._edge_color().b > 0.9, "lane dividers are bright sky blue"):
+		return
+	if not _check(game._jump_marker_color().g > 0.9 and game._jump_marker_color().b > 0.8, "jump warning marker is fluorescent"):
+		return
 	var stable_color: Color = game._tile_color(false)
 	var unstable_color: Color = game._tile_color(true)
 	if not _check(stable_color.b < 0.28 and stable_color.r < 0.08, "stable tiles are dark navy"):
@@ -38,6 +44,17 @@ func _initialize() -> void:
 	if not _check(not hint_label.visible, "bottom key hint stays hidden"):
 		return
 	if not _check(game.player_visual.mesh is BoxMesh, "player is a simple cube"):
+		return
+	var box_mesh := game.player_visual.mesh as BoxMesh
+	if not _check(is_equal_approx(box_mesh.size.x, box_mesh.size.y), "player cube has square front"):
+		return
+	if not _check(game.player_visual.rotation.z != 0.0, "player cube is tilted for bounce feel"):
+		return
+	game.world_time = 0.0
+	var mover_offset_a: float = game._mover_offset(0)
+	game.world_time = 0.6
+	var mover_offset_b: float = game._mover_offset(0)
+	if not _check(abs(mover_offset_a - mover_offset_b) > 0.05, "moving obstacle sweeps across a face over time"):
 		return
 
 	game._change_lane(1)
