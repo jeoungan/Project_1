@@ -12,11 +12,11 @@ const Rules := preload("res://scripts/electron_dash/electron_dash_rules.gd")
 @export var lane_turn_speed: float = 8.0
 @export var auto_restart_seconds: float = 1.1
 @export var respawn_invincible_seconds: float = 2.0
-@export var max_extra_lives: int = 2
 @export var visual_grid_lanes: int = 10
 @export var hazard_check_lead: float = 0.15
 @export var jump_buffer_seconds: float = 0.14
 @export var jump_ready_height: float = 0.08
+@export var lane_change_grace_seconds: float = 0.22
 
 var player_lane: int = 0
 var target_angle: float = 0.0
@@ -28,10 +28,10 @@ var distance: float = 0.0
 var score: int = 0
 var best_score: int = 0
 var survival_time: float = 0.0
-var extra_lives: int = 0
 var invincible_timer: float = 0.0
 var status_message_timer: float = 0.0
 var jump_buffer_timer: float = 0.0
+var lane_change_grace_timer: float = 0.0
 var next_segment_index: int = 0
 var segments: Array = []
 var restart_countdown: float = 0.0
@@ -64,10 +64,10 @@ func reset_game() -> void:
 	distance = 0.0
 	survival_time = 0.0
 	score = 0
-	extra_lives = 0
 	invincible_timer = 0.0
 	status_message_timer = 0.0
 	jump_buffer_timer = 0.0
+	lane_change_grace_timer = 0.0
 	next_segment_index = 0
 	is_alive = true
 	restart_countdown = 0.0
@@ -103,6 +103,8 @@ func _process(delta: float) -> void:
 		overlay_label.visible = false
 	if jump_buffer_timer > 0.0:
 		jump_buffer_timer = max(0.0, jump_buffer_timer - delta)
+	if lane_change_grace_timer > 0.0:
+		lane_change_grace_timer = max(0.0, lane_change_grace_timer - delta)
 	_update_jump(delta)
 	_try_consume_jump()
 	_update_player_transform(delta)
@@ -112,6 +114,7 @@ func _process(delta: float) -> void:
 func _change_lane(delta_lane: int) -> void:
 	player_lane = Rules.wrap_lane(player_lane, delta_lane, lane_count)
 	target_angle = _roll_for_lane(player_lane)
+	lane_change_grace_timer = lane_change_grace_seconds
 
 func _queue_jump() -> void:
 	jump_buffer_timer = jump_buffer_seconds
@@ -151,14 +154,7 @@ func _scroll_segments(speed: float, delta: float) -> void:
 		if not bool(segment["checked"]) and _segment_reaches_player(root.position.z):
 			segment["checked"] = true
 			var data: Dictionary = segment["data"]
-			if Rules.segment_has_heart(data, player_lane):
-				_collect_heart()
-				var hearts: Array = data["hearts"]
-				hearts[player_lane] = false
-				data["hearts"] = hearts
-				segment["data"] = data
-				_rebuild_segment(segment)
-			if invincible_timer <= 0.0 and Rules.should_crash(data, player_lane, jump_height <= 0.08, false):
+			if _hazards_are_active() and invincible_timer <= 0.0 and Rules.should_crash(data, player_lane, jump_height <= 0.08, false):
 				_handle_crash()
 		if root.position.z > player_z + segment_depth * 4.0:
 			root.position.z = farthest_z - segment_depth
@@ -175,26 +171,16 @@ func _farthest_segment_z() -> float:
 		result = min(result, root.position.z)
 	return result
 
-func _collect_heart() -> void:
-	extra_lives = min(max_extra_lives, extra_lives + 1)
-	overlay_label.visible = false
-	status_message_timer = 0.0
-
 func _handle_crash() -> void:
 	if invincible_timer > 0.0:
-		return
-	if extra_lives > 0:
-		extra_lives -= 1
-		invincible_timer = respawn_invincible_seconds
-		jump_height = max(jump_height, 1.0)
-		vertical_velocity = jump_velocity * 0.35
-		overlay_label.visible = false
-		status_message_timer = 0.0
 		return
 	_game_over()
 
 func _segment_reaches_player(segment_z: float) -> bool:
 	return segment_z >= player_z - hazard_check_lead
+
+func _hazards_are_active() -> bool:
+	return lane_change_grace_timer <= 0.0
 
 func _game_over() -> void:
 	is_alive = false
@@ -226,12 +212,10 @@ func _rebuild_segment(segment: Dictionary) -> void:
 	root.add_child(_make_tunnel_grid())
 	for lane in range(lane_count):
 		if Rules.segment_has_floor(data, lane):
-			var color := Color(1.0, 0.55, 0.1, 1.0) if Rules.segment_has_unstable(data, lane) else Color(0.1, 0.9, 1.0, 1.0)
-			root.add_child(_make_tile(lane, color, Rules.segment_has_unstable(data, lane)))
+			var is_unstable := Rules.segment_has_unstable(data, lane)
+			root.add_child(_make_tile(lane, _tile_color(is_unstable), is_unstable))
 		if Rules.segment_has_laser(data, lane):
 			root.add_child(_make_laser(lane))
-		if Rules.segment_has_heart(data, lane):
-			root.add_child(_make_heart(lane))
 
 func _make_tunnel_grid() -> Node3D:
 	var grid := Node3D.new()
@@ -258,27 +242,19 @@ func _make_tile(lane: int, color: Color, is_unstable: bool = false) -> MeshInsta
 
 func _make_laser(lane: int) -> Node3D:
 	var root := Node3D.new()
-	var panel_width: float = _panel_width(0.56)
-	for z_offset in [-0.22, 0.22]:
-		var mesh := BoxMesh.new()
-		mesh.size = Vector3(panel_width, 0.12, 0.12)
-		mesh.material = _make_emissive_material(Color(1.0, 0.05, 0.18, 1.0), 3.0)
-		var laser := MeshInstance3D.new()
-		laser.mesh = mesh
-		_place_on_tunnel(laser, lane, tunnel_radius - 1.05)
-		laser.position.z += z_offset
-		root.add_child(laser)
+	var panel_width: float = _panel_width(0.72)
+	root.add_child(_make_laser_beam(lane, Vector3(panel_width, 0.22, 0.20), Color(1.0, 0.02, 0.08, 0.42), 2.2))
+	root.add_child(_make_laser_beam(lane, Vector3(panel_width, 0.055, 0.075), Color(1.0, 0.02, 0.08, 1.0), 4.0))
 	return root
 
-func _make_heart(lane: int) -> MeshInstance3D:
-	var mesh := SphereMesh.new()
-	mesh.radius = 0.28
-	mesh.height = 0.38
-	mesh.material = _make_emissive_material(Color(1.0, 0.12, 0.42, 1.0), 2.4)
-	var heart := MeshInstance3D.new()
-	heart.mesh = mesh
-	_place_on_tunnel(heart, lane, tunnel_radius - 1.18)
-	return heart
+func _make_laser_beam(lane: int, size: Vector3, color: Color, energy: float) -> MeshInstance3D:
+	var mesh := BoxMesh.new()
+	mesh.size = size
+	mesh.material = _make_laser_material(color, energy)
+	var laser := MeshInstance3D.new()
+	laser.mesh = mesh
+	_place_on_tunnel(laser, lane, tunnel_radius - 1.05)
+	return laser
 
 func _place_on_tunnel(node: Node3D, lane: int, radius: float) -> void:
 	var angle: float = _visual_lane_angle(lane)
@@ -298,8 +274,11 @@ func _roll_for_lane(lane: int) -> float:
 func _panel_width(scale_factor: float) -> float:
 	return max(2.2, TAU * tunnel_radius / float(lane_count) * scale_factor)
 
-func _tile_depth(is_unstable: bool) -> float:
-	return segment_depth * (0.86 if is_unstable else 0.96)
+func _tile_depth(_is_unstable: bool) -> float:
+	return segment_depth * 1.08
+
+func _tile_color(is_unstable: bool) -> Color:
+	return Color(0.035, 0.10, 0.24, 1.0) if is_unstable else Color(0.012, 0.045, 0.14, 1.0)
 
 func _configure_world() -> void:
 	var environment := Environment.new()
@@ -366,8 +345,14 @@ func _make_emissive_material(color: Color, energy: float) -> StandardMaterial3D:
 	material.emission_energy_multiplier = energy
 	return material
 
+func _make_laser_material(color: Color, energy: float) -> StandardMaterial3D:
+	var material := _make_emissive_material(color, energy)
+	if color.a < 1.0:
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	return material
+
 func _update_hud() -> void:
 	score_label.text = "TIME %03d   BEST %03d" % [score, best_score]
-	speed_label.text = "SPEED %.1f   HEARTS %d" % [Rules.speed_for_distance(distance), extra_lives]
+	speed_label.text = "SPEED %.1f" % Rules.speed_for_distance(distance)
 	hint_label.text = "A/D or Arrows   W/Up: jump   R: restart"
 	hint_label.visible = false

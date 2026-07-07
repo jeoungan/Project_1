@@ -31,12 +31,6 @@ static func segment_has_unstable(segment: Dictionary, lane: int) -> bool:
 		return false
 	return bool(unstable[lane])
 
-static func segment_has_heart(segment: Dictionary, lane: int) -> bool:
-	var hearts: Array = segment.get("hearts", [])
-	if lane < 0 or lane >= hearts.size():
-		return false
-	return bool(hearts[lane])
-
 static func should_crash(segment: Dictionary, lane: int, is_grounded: bool, _is_ducking: bool) -> bool:
 	if is_grounded and not segment_has_floor(segment, lane):
 		return true
@@ -53,12 +47,10 @@ static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary
 	var floors: Array = []
 	var lasers: Array = []
 	var unstable: Array = []
-	var hearts: Array = []
 	for _i in range(lane_count):
 		floors.append(true)
 		lasers.append(false)
 		unstable.append(false)
-		hearts.append(false)
 
 	if index >= SAFE_START_SEGMENTS:
 		if index % 5 == 0:
@@ -75,12 +67,6 @@ static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary
 			var unstable_lane := positive_mod(index * 4 + 1, lane_count)
 			if bool(floors[unstable_lane]) and not bool(lasers[unstable_lane]):
 				unstable[unstable_lane] = true
-		if index % 11 == 0:
-			var heart_lane := positive_mod(index * 3 + 4, lane_count)
-			floors[heart_lane] = true
-			lasers[heart_lane] = false
-			unstable[heart_lane] = false
-			hearts[heart_lane] = true
 		if not _arrays_have_safe_lane(floors, lasers, unstable, lane_count):
 			var safe_lane := positive_mod(index + 1, lane_count)
 			floors[safe_lane] = true
@@ -91,8 +77,7 @@ static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary
 		"index": index,
 		"floors": floors,
 		"lasers": lasers,
-		"unstable": unstable,
-		"hearts": hearts
+		"unstable": unstable
 	}
 
 static func segment_has_safe_lane(segment: Dictionary, lane_count: int = LANE_COUNT) -> bool:

@@ -20,7 +20,13 @@ func _initialize() -> void:
 		return
 	if not _check(game.segment_depth >= 3.2, "rows are spaced far enough to read gaps"):
 		return
-	if not _check(game._tile_depth(false) >= game.segment_depth * 0.92, "ordinary road tiles connect into a continuous path"):
+	if not _check(game._tile_depth(false) >= game.segment_depth * 1.02, "ordinary road tiles overlap into a continuous path"):
+		return
+	var stable_color: Color = game._tile_color(false)
+	var unstable_color: Color = game._tile_color(true)
+	if not _check(stable_color.b < 0.28 and stable_color.r < 0.08, "stable tiles are dark navy"):
+		return
+	if not _check(unstable_color.b > stable_color.b and unstable_color.r < 0.12, "unstable tiles are a lighter navy"):
 		return
 	if not _check(game.lane_turn_speed <= 9.0, "lane rotation is eased instead of snapping"):
 		return
@@ -51,20 +57,14 @@ func _initialize() -> void:
 		return
 
 	game.reset_game()
-	game._collect_heart()
-	if not _check(game.extra_lives == 1, "heart pickup grants an extra life"):
-		return
 	var overlay_label: Label = game.get_node("%OverlayLabel")
-	if not _check(not overlay_label.visible, "heart pickup does not show center text"):
+	game._change_lane(1)
+	if not _check(game.lane_change_grace_timer > 0.0, "lane changes get a short collision grace window"):
 		return
-	game._handle_crash()
-	if not _check(game.is_alive, "extra life respawns instead of ending the run"):
+	if not _check(not game._hazards_are_active(), "hazards pause while the lane is rotating"):
 		return
-	if not _check(game.extra_lives == 0, "respawn consumes one extra life"):
-		return
-	if not _check(game.invincible_timer > 0.0, "respawn grants brief invincibility"):
-		return
-	if not _check(not overlay_label.visible, "extra life respawn does not show center text"):
+	game._process(game.lane_change_grace_seconds + 0.05)
+	if not _check(game._hazards_are_active(), "hazards resume after lane rotation grace"):
 		return
 
 	if not _check(not game._segment_reaches_player(game.player_z - game.segment_depth * 0.45), "hazard check does not fire before the tile is under the player"):
