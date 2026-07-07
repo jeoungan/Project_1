@@ -31,9 +31,16 @@ func _initialize() -> void:
 	if not _check(default_segment["hearts"].size() == 5, "default segment has five heart lanes"):
 		return
 
-	var five_lane_gap_a: Array = Rules.make_segment(6, 5)["floors"]
-	var five_lane_gap_b: Array = Rules.make_segment(7, 5)["floors"]
+	var five_lane_gap_a: Array = Rules.make_segment(10, 5)["floors"]
+	var five_lane_gap_b: Array = Rules.make_segment(15, 5)["floors"]
 	if not _check(five_lane_gap_a.find(false) != five_lane_gap_b.find(false), "five-panel gaps vary by segment"):
+		return
+
+	var continuous_segment: Dictionary = Rules.make_segment(Rules.SAFE_START_SEGMENTS + 1, 5)
+	if not _check(continuous_segment["floors"].find(false) == -1, "non-jump segments keep the road continuous"):
+		return
+	var jump_gap_segment: Dictionary = Rules.make_segment(10, 5)
+	if not _check(jump_gap_segment["floors"].find(false) >= 0, "jump-gap segments still create a visible hole"):
 		return
 
 	var heart_segment := Rules.make_segment(11, 5)
@@ -67,6 +74,8 @@ func _initialize() -> void:
 	if not _check(Rules.should_crash(danger_segment, 2, true, false), "unstable panels collapse under grounded player"):
 		return
 	if not _check(Rules.speed_for_distance(1000.0) > Rules.speed_for_distance(0.0), "speed rises with distance"):
+		return
+	if not _check(Rules.speed_for_distance(0.0) <= 13.0, "starting speed is slower and readable"):
 		return
 
 	print("test_electron_dash_rules passed")

@@ -20,7 +20,7 @@ func _initialize() -> void:
 		return
 	if not _check(game.segment_depth >= 3.2, "rows are spaced far enough to read gaps"):
 		return
-	if not _check(game._tile_depth(false) <= game.segment_depth * 0.65, "jump gaps stay visually wide"):
+	if not _check(game._tile_depth(false) >= game.segment_depth * 0.92, "ordinary road tiles connect into a continuous path"):
 		return
 	if not _check(game.lane_turn_speed <= 9.0, "lane rotation is eased instead of snapping"):
 		return

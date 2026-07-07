@@ -47,7 +47,7 @@ static func should_crash(segment: Dictionary, lane: int, is_grounded: bool, _is_
 	return false
 
 static func speed_for_distance(distance: float) -> float:
-	return 18.0 + min(distance / 220.0, 18.0)
+	return 12.0 + min(distance / 320.0, 10.0)
 
 static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary:
 	var floors: Array = []
@@ -61,15 +61,17 @@ static func make_segment(index: int, lane_count: int = LANE_COUNT) -> Dictionary
 		hearts.append(false)
 
 	if index >= SAFE_START_SEGMENTS:
-		var gap_lane := positive_mod(index * 2 + 2, lane_count)
-		floors[gap_lane] = false
-		if index % 4 == 0:
-			floors[wrap_lane(gap_lane, 1, lane_count)] = false
 		if index % 5 == 0:
+			var jump_index: int = int(index / 5)
+			var gap_lane := positive_mod(jump_index * 2 + 1, lane_count)
+			floors[gap_lane] = false
+			if index % 10 == 0:
+				floors[wrap_lane(gap_lane, 1, lane_count)] = false
+		if index % 7 == 0:
 			lasers[positive_mod(index * 3 + 1, lane_count)] = true
-		if index % 9 == 0:
+		if index % 13 == 0:
 			lasers[positive_mod(index * 3 + 5, lane_count)] = true
-		if index % 3 == 0:
+		if index % 9 == 0:
 			var unstable_lane := positive_mod(index * 4 + 1, lane_count)
 			if bool(floors[unstable_lane]) and not bool(lasers[unstable_lane]):
 				unstable[unstable_lane] = true

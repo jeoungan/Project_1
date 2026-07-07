@@ -299,7 +299,7 @@ func _panel_width(scale_factor: float) -> float:
 	return max(2.2, TAU * tunnel_radius / float(lane_count) * scale_factor)
 
 func _tile_depth(is_unstable: bool) -> float:
-	return segment_depth * (0.54 if is_unstable else 0.60)
+	return segment_depth * (0.86 if is_unstable else 0.96)
 
 func _configure_world() -> void:
 	var environment := Environment.new()
