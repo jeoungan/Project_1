@@ -54,12 +54,31 @@ func _initialize() -> void:
 	game._collect_heart()
 	if not _check(game.extra_lives == 1, "heart pickup grants an extra life"):
 		return
+	var overlay_label: Label = game.get_node("%OverlayLabel")
+	if not _check(not overlay_label.visible, "heart pickup does not show center text"):
+		return
 	game._handle_crash()
 	if not _check(game.is_alive, "extra life respawns instead of ending the run"):
 		return
 	if not _check(game.extra_lives == 0, "respawn consumes one extra life"):
 		return
 	if not _check(game.invincible_timer > 0.0, "respawn grants brief invincibility"):
+		return
+	if not _check(not overlay_label.visible, "extra life respawn does not show center text"):
+		return
+
+	if not _check(not game._segment_reaches_player(game.player_z - game.segment_depth * 0.45), "hazard check does not fire before the tile is under the player"):
+		return
+	if not _check(game._segment_reaches_player(game.player_z - 0.05), "hazard check fires near the player"):
+		return
+
+	game.reset_game()
+	game.invincible_timer = 2.0
+	game.jump_height = 0.3
+	game.vertical_velocity = -12.0
+	game.jump_buffer_timer = game.jump_buffer_seconds
+	game._process(0.05)
+	if not _check(game.vertical_velocity > 0.0, "queued jump triggers on landing"):
 		return
 
 	if not _check(game.shadow_visual != null and game.shadow_visual.visible, "player shadow is visible for orientation"):
@@ -68,7 +87,6 @@ func _initialize() -> void:
 	game._game_over()
 	if not _check(not game.is_alive, "game enters fail state first"):
 		return
-	var overlay_label: Label = game.get_node("%OverlayLabel")
 	if not _check(overlay_label.text.contains("PRESS R"), "game over waits for manual restart"):
 		return
 	game._process(game.auto_restart_seconds + 0.1)

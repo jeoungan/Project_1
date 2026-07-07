@@ -14,6 +14,9 @@ const Rules := preload("res://scripts/electron_dash/electron_dash_rules.gd")
 @export var respawn_invincible_seconds: float = 2.0
 @export var max_extra_lives: int = 2
 @export var visual_grid_lanes: int = 10
+@export var hazard_check_lead: float = 0.15
+@export var jump_buffer_seconds: float = 0.14
+@export var jump_ready_height: float = 0.08
 
 var player_lane: int = 0
 var target_angle: float = 0.0
@@ -28,6 +31,7 @@ var survival_time: float = 0.0
 var extra_lives: int = 0
 var invincible_timer: float = 0.0
 var status_message_timer: float = 0.0
+var jump_buffer_timer: float = 0.0
 var next_segment_index: int = 0
 var segments: Array = []
 var restart_countdown: float = 0.0
@@ -63,6 +67,7 @@ func reset_game() -> void:
 	extra_lives = 0
 	invincible_timer = 0.0
 	status_message_timer = 0.0
+	jump_buffer_timer = 0.0
 	next_segment_index = 0
 	is_alive = true
 	restart_countdown = 0.0
@@ -79,7 +84,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("move_right") and is_alive:
 		_change_lane(1)
 	elif event.is_action_pressed("jump") and is_alive:
-		_jump()
+		_queue_jump()
 	elif event.is_action_pressed("restart"):
 		reset_game()
 
@@ -96,7 +101,10 @@ func _process(delta: float) -> void:
 		status_message_timer = max(0.0, status_message_timer - delta)
 	elif invincible_timer <= 0.0:
 		overlay_label.visible = false
+	if jump_buffer_timer > 0.0:
+		jump_buffer_timer = max(0.0, jump_buffer_timer - delta)
 	_update_jump(delta)
+	_try_consume_jump()
 	_update_player_transform(delta)
 	_scroll_segments(speed, delta)
 	_update_hud()
@@ -105,9 +113,14 @@ func _change_lane(delta_lane: int) -> void:
 	player_lane = Rules.wrap_lane(player_lane, delta_lane, lane_count)
 	target_angle = _roll_for_lane(player_lane)
 
-func _jump() -> void:
-	if jump_height <= 0.02:
+func _queue_jump() -> void:
+	jump_buffer_timer = jump_buffer_seconds
+	_try_consume_jump()
+
+func _try_consume_jump() -> void:
+	if jump_buffer_timer > 0.0 and jump_height <= jump_ready_height:
 		vertical_velocity = jump_velocity
+		jump_buffer_timer = 0.0
 
 func _update_jump(delta: float) -> void:
 	vertical_velocity -= gravity * delta
@@ -135,7 +148,7 @@ func _scroll_segments(speed: float, delta: float) -> void:
 	for segment in segments:
 		var root := segment["root"] as Node3D
 		root.position.z += speed * delta
-		if not bool(segment["checked"]) and root.position.z >= player_z - segment_depth * 0.45:
+		if not bool(segment["checked"]) and _segment_reaches_player(root.position.z):
 			segment["checked"] = true
 			var data: Dictionary = segment["data"]
 			if Rules.segment_has_heart(data, player_lane):
@@ -164,9 +177,8 @@ func _farthest_segment_z() -> float:
 
 func _collect_heart() -> void:
 	extra_lives = min(max_extra_lives, extra_lives + 1)
-	overlay_label.text = "HEART +1"
-	overlay_label.visible = true
-	status_message_timer = 0.7
+	overlay_label.visible = false
+	status_message_timer = 0.0
 
 func _handle_crash() -> void:
 	if invincible_timer > 0.0:
@@ -176,11 +188,13 @@ func _handle_crash() -> void:
 		invincible_timer = respawn_invincible_seconds
 		jump_height = max(jump_height, 1.0)
 		vertical_velocity = jump_velocity * 0.35
-		overlay_label.text = "EXTRA LIFE"
-		overlay_label.visible = true
-		status_message_timer = respawn_invincible_seconds
+		overlay_label.visible = false
+		status_message_timer = 0.0
 		return
 	_game_over()
+
+func _segment_reaches_player(segment_z: float) -> bool:
+	return segment_z >= player_z - hazard_check_lead
 
 func _game_over() -> void:
 	is_alive = false
