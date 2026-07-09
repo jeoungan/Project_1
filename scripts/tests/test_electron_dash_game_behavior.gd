@@ -233,6 +233,11 @@ func _initialize() -> void:
 		return
 	if not _check(overlay_backdrop.color.a >= 0.65, "game over background is readable"):
 		return
+	if not _check(overlay_backdrop.modulate.a <= 0.01, "game over overlay starts transparent instead of snapping on"):
+		return
+	game._process(game.death_overlay_fade_seconds + 0.05)
+	if not _check(overlay_backdrop.modulate.a > 0.95, "game over overlay fades in smoothly"):
+		return
 	if not _check(overlay_label.text.contains("17초"), "game over shows survived seconds"):
 		return
 	if not _check(overlay_label.text.contains("R"), "game over tells the player to press R"):
@@ -246,7 +251,13 @@ func _initialize() -> void:
 	restart_touch.pressed = true
 	restart_touch.position = Vector2(240.0, 520.0)
 	game._unhandled_input(restart_touch)
-	if not _check(game.is_alive and not overlay_backdrop.visible, "tap restarts after game over on mobile"):
+	if not _check(not game.is_alive and game.is_restart_transitioning, "tap begins a smooth restart transition on mobile"):
+		return
+	game._process(game.restart_transition_seconds + 0.05)
+	if not _check(game.is_alive and overlay_backdrop.visible, "restart completes after the fade covers the map reset"):
+		return
+	game._process(game.spawn_fade_seconds + 0.05)
+	if not _check(game.is_alive and not overlay_backdrop.visible, "new run fades back in after restart"):
 		return
 
 	game.free()

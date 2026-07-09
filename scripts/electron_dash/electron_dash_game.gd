@@ -10,7 +10,7 @@ const UiFont := preload("res://assets/fonts/NanumGothic.ttf")
 @export var player_z: float = 3.0
 @export var jump_velocity: float = 10.4
 @export var gravity: float = 20.0
-@export var lane_turn_speed: float = 8.0
+@export var lane_turn_speed: float = 6.8
 @export var auto_restart_seconds: float = 1.1
 @export var respawn_invincible_seconds: float = 2.0
 @export var visual_grid_lanes: int = 10
@@ -25,6 +25,9 @@ const UiFont := preload("res://assets/fonts/NanumGothic.ttf")
 @export var portrait_camera_z: float = 13.6
 @export var landscape_camera_z: float = 12.0
 @export var portrait_camera_y: float = 0.55
+@export var death_overlay_fade_seconds: float = 0.28
+@export var restart_transition_seconds: float = 0.24
+@export var spawn_fade_seconds: float = 0.24
 
 var player_lane: int = 0
 var target_angle: float = 0.0
@@ -51,6 +54,11 @@ var touch_active: bool = false
 var touch_start_position: Vector2 = Vector2.ZERO
 var touch_drag_delta: Vector2 = Vector2.ZERO
 var touch_swipe_consumed: bool = false
+var death_timer: float = 0.0
+var restart_transition_timer: float = 0.0
+var restart_start_alpha: float = 0.0
+var spawn_fade_timer: float = 0.0
+var is_restart_transitioning: bool = false
 
 @onready var tube_root: Node3D = %TubeRoot
 @onready var player_pivot: Node3D = %PlayerPivot
@@ -69,7 +77,7 @@ func _ready() -> void:
 	_build_player_mesh()
 	reset_game()
 
-func reset_game() -> void:
+func reset_game(with_intro_fade: bool = false) -> void:
 	for child in tube_root.get_children():
 		child.queue_free()
 	segments.clear()
@@ -90,16 +98,28 @@ func reset_game() -> void:
 	touch_active = false
 	touch_drag_delta = Vector2.ZERO
 	touch_swipe_consumed = false
+	death_timer = 0.0
+	restart_transition_timer = 0.0
+	restart_start_alpha = 0.0
+	is_restart_transitioning = false
 	next_segment_index = 0
 	is_alive = true
 	restart_countdown = 0.0
-	overlay_backdrop.visible = false
 	overlay_label.visible = false
+	player_visual.scale = Vector3.ONE
 	hint_label.visible = false
 	for i in range(visible_segments):
 		_spawn_segment(-float(i) * segment_depth)
 	_update_player_transform(0.0)
 	_update_hud()
+	if with_intro_fade:
+		spawn_fade_timer = spawn_fade_seconds
+		overlay_backdrop.visible = true
+		_set_overlay_alpha(1.0)
+	else:
+		spawn_fade_timer = 0.0
+		overlay_backdrop.visible = false
+		_set_overlay_alpha(0.0)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
@@ -115,12 +135,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("jump") and is_alive:
 		_queue_jump()
 	elif event.is_action_pressed("restart"):
-		reset_game()
+		_request_restart()
 
 func _handle_screen_touch(event: InputEventScreenTouch) -> void:
 	if event.pressed:
 		if not is_alive:
-			reset_game()
+			_request_restart()
 			return
 		touch_active = true
 		touch_swipe_consumed = false
@@ -162,7 +182,11 @@ func _try_apply_swipe_delta(delta: Vector2) -> bool:
 	return false
 
 func _process(delta: float) -> void:
+	if is_restart_transitioning:
+		_update_restart_transition(delta)
+		return
 	if not is_alive:
+		_update_game_over_visuals(delta)
 		return
 	var speed: float = Rules.speed_for_distance(distance)
 	world_time += delta
@@ -184,12 +208,25 @@ func _process(delta: float) -> void:
 	_update_player_transform(delta)
 	_animate_movers()
 	_scroll_segments(speed, delta)
+	_update_spawn_fade(delta)
 	_update_hud()
 
 func _change_lane(delta_lane: int) -> void:
+	if is_restart_transitioning:
+		return
 	player_lane = Rules.wrap_lane(player_lane, delta_lane, lane_count)
 	target_angle = _roll_for_lane(player_lane)
 	lane_change_grace_timer = lane_change_grace_seconds
+
+func _request_restart() -> void:
+	if is_restart_transitioning:
+		return
+	is_restart_transitioning = true
+	restart_transition_timer = 0.0
+	restart_start_alpha = overlay_backdrop.modulate.a if overlay_backdrop.visible else 0.0
+	overlay_backdrop.visible = true
+	if overlay_label.visible:
+		overlay_label.modulate.a = restart_start_alpha
 
 func _queue_jump() -> void:
 	jump_buffer_timer = jump_buffer_seconds
@@ -208,20 +245,26 @@ func _update_jump(delta: float) -> void:
 		vertical_velocity = 0.0
 
 func _update_player_transform(delta: float) -> void:
-	var blend: float = min(1.0, lane_turn_speed * delta)
+	var blend: float = _smoothing_weight(delta, lane_turn_speed)
 	visual_angle = lerp_angle(visual_angle, target_angle, blend)
 	tube_root.rotation.z = visual_angle
 	player_pivot.rotation.z = 0.0
 	player_pivot.position = Vector3(0.0, 0.0, player_z)
-	player_visual.position = Vector3(0.0, -tunnel_radius + 0.55 + jump_height + _player_bob_offset(), 0.0)
-	player_visual.rotation = Vector3(0.0, 0.0, _player_spin_angle())
+	var crash_amount: float = 0.0 if is_alive else _ease_out_cubic(min(1.0, death_timer / 0.36))
+	player_visual.position = Vector3(
+		0.0,
+		-tunnel_radius + 0.55 + jump_height + _player_bob_offset() - crash_amount * 0.18,
+		crash_amount * 0.34
+	)
+	player_visual.rotation = Vector3(0.0, 0.0, _player_spin_angle() + death_timer * 3.8 * crash_amount)
+	player_visual.scale = Vector3(1.0 + crash_amount * 0.08, 1.0 - crash_amount * 0.10, 1.0)
 	player_visual.visible = invincible_timer <= 0.0 or int(Time.get_ticks_msec() / 120) % 2 == 0
 	if shadow_visual != null:
 		shadow_visual.position = Vector3(0.0, -tunnel_radius + 0.04, 0.0)
 		shadow_visual.scale = Vector3(1.0 + jump_height * 0.18, 1.0, 1.0 + jump_height * 0.18)
 		shadow_visual.visible = true
 	var viewport_size := _current_viewport_size()
-	var camera_blend: float = 1.0 if delta <= 0.0 else min(1.0, delta * 2.5)
+	var camera_blend: float = 1.0 if delta <= 0.0 else _smoothing_weight(delta, 2.5)
 	camera_3d.fov = lerp(camera_3d.fov, _target_camera_fov(viewport_size, distance), camera_blend)
 	camera_3d.position.z = lerp(camera_3d.position.z, _target_camera_z(viewport_size), camera_blend)
 	camera_3d.position.y = lerp(camera_3d.position.y, _target_camera_y(viewport_size), camera_blend)
@@ -293,9 +336,58 @@ func _game_over() -> void:
 	is_alive = false
 	best_score = max(best_score, score)
 	restart_countdown = auto_restart_seconds
+	death_timer = 0.0
 	overlay_label.text = "기록: %d초 생존\nR 또는 화면 탭으로 다시 시작" % score
 	overlay_backdrop.visible = true
 	overlay_label.visible = true
+	_set_overlay_alpha(0.0)
+
+func _update_game_over_visuals(delta: float) -> void:
+	death_timer += delta
+	world_time += delta * 0.18
+	_update_player_transform(delta)
+	var fade: float = _ease_out_cubic(min(1.0, death_timer / death_overlay_fade_seconds))
+	_set_overlay_alpha(fade)
+
+func _update_restart_transition(delta: float) -> void:
+	restart_transition_timer += delta
+	var progress: float = min(1.0, restart_transition_timer / restart_transition_seconds)
+	var eased: float = _ease_in_out_cubic(progress)
+	overlay_backdrop.visible = true
+	overlay_backdrop.modulate.a = lerp(restart_start_alpha, 1.0, eased)
+	if overlay_label.visible:
+		overlay_label.modulate.a = lerp(restart_start_alpha, 0.0, eased)
+	if progress >= 1.0:
+		reset_game(true)
+
+func _update_spawn_fade(delta: float) -> void:
+	if spawn_fade_timer <= 0.0:
+		return
+	spawn_fade_timer = max(0.0, spawn_fade_timer - delta)
+	var remaining: float = spawn_fade_timer / spawn_fade_seconds
+	var alpha: float = _ease_in_out_cubic(remaining)
+	overlay_backdrop.visible = alpha > 0.01
+	overlay_label.visible = false
+	_set_overlay_alpha(alpha)
+
+func _set_overlay_alpha(alpha: float) -> void:
+	overlay_backdrop.modulate.a = alpha
+	overlay_label.modulate.a = alpha
+
+func _smoothing_weight(delta: float, responsiveness: float) -> float:
+	if delta <= 0.0:
+		return 1.0
+	return clamp(1.0 - exp(-responsiveness * delta), 0.0, 1.0)
+
+func _ease_out_cubic(value: float) -> float:
+	var t: float = clamp(value, 0.0, 1.0)
+	return 1.0 - pow(1.0 - t, 3.0)
+
+func _ease_in_out_cubic(value: float) -> float:
+	var t: float = clamp(value, 0.0, 1.0)
+	if t < 0.5:
+		return 4.0 * t * t * t
+	return 1.0 - pow(-2.0 * t + 2.0, 3.0) * 0.5
 
 func _spawn_segment(z_position: float) -> void:
 	var root := Node3D.new()
