@@ -141,6 +141,22 @@ body {
 }
 		</style>
 		<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#001833">
+		<script>
+(function () {
+	const params = new URLSearchParams(window.location.search);
+	if (params.get('godot') === '1' || params.get('desktop') === '1') {
+		return;
+	}
+	const userAgent = navigator.userAgent || '';
+	const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile|SamsungBrowser|KAKAOTALK|NAVER|CriOS|FxiOS/i.test(userAgent);
+	const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+	const narrowViewport = Math.min(window.innerWidth || 9999, window.innerHeight || 9999) <= 920;
+	const narrowScreen = Math.min(window.screen.width || 9999, window.screen.height || 9999) <= 920;
+	if ((mobileUserAgent || coarsePointer || narrowViewport) && (narrowScreen || narrowViewport)) {
+		window.location.replace('mobile.html' + window.location.search + window.location.hash);
+	}
+}());
+		</script>
 	</head>
 	<body>
 		<canvas id="canvas">
