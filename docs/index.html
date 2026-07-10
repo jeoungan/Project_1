@@ -1,8 +1,8 @@
 ﻿<!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 		<title>집에 가고 싶다</title>
 		<style>
 html, body, #canvas {
@@ -11,36 +11,15 @@ html, body, #canvas {
 	border: 0;
 }
 
-html, body {
-	width: 100%;
-	height: 100%;
-	min-height: 100vh;
-	min-height: 100dvh;
-}
-
 body {
 	color: white;
-	background-color: #001833;
+	background-color: black;
 	overflow: hidden;
 	touch-action: none;
-	position: fixed;
-	inset: 0;
-	-webkit-user-select: none;
-	user-select: none;
-	-webkit-tap-highlight-color: transparent;
 }
 
 #canvas {
 	display: block;
-	width: 100vw !important;
-	height: 100vh !important;
-	height: 100dvh !important;
-	max-width: 100vw;
-	max-height: 100vh;
-	max-height: 100dvh;
-	background-color: #001833;
-	object-fit: cover;
-	touch-action: none;
 }
 
 #canvas:focus {
@@ -65,9 +44,6 @@ body {
 	justify-content: center;
 	align-items: center;
 	visibility: hidden;
-	z-index: 10;
-	font-family: 'Noto Sans KR', 'Noto Sans', 'Droid Sans', Arial, sans-serif;
-	text-align: center;
 }
 
 #status-splash {
@@ -95,34 +71,9 @@ body {
 }
 
 #status-progress {
-	position: static;
-	width: min(72vw, 28rem);
-	height: 0.65rem;
+	bottom: 10%;
+	width: 50%;
 	margin: 0 auto;
-	accent-color: #5eeaff;
-	filter: drop-shadow(0 0 0.9rem rgba(94, 234, 255, 0.75));
-}
-
-#loading-copy {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	gap: 0.45rem;
-	margin-bottom: 1.4rem;
-	color: #f7fdff;
-	text-shadow: 0 0 0.75rem rgba(0, 182, 255, 0.9), 0 0 1.6rem rgba(0, 99, 255, 0.65);
-}
-
-#loading-copy strong {
-	font-size: clamp(1.6rem, 8vw, 3rem);
-	line-height: 1;
-}
-
-#loading-copy span {
-	color: #bff7ff;
-	font-size: clamp(0.95rem, 4vw, 1.25rem);
-	font-weight: 700;
-	letter-spacing: 0;
 }
 
 #status-notice {
@@ -133,30 +84,13 @@ body {
 	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
 	line-height: 1.3;
 	margin: 0 2rem;
-	max-width: 28rem;
 	overflow: hidden;
 	padding: 1rem;
 	text-align: center;
 	z-index: 1;
 }
 		</style>
-		<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#001833">
-		<script>
-(function () {
-	const params = new URLSearchParams(window.location.search);
-	if (params.get('godot') === '1' || params.get('desktop') === '1') {
-		return;
-	}
-	const userAgent = navigator.userAgent || '';
-	const mobileUserAgent = /Android|iPhone|iPad|iPod|Mobile|SamsungBrowser|KAKAOTALK|NAVER|CriOS|FxiOS/i.test(userAgent);
-	const coarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-	const narrowViewport = Math.min(window.innerWidth || 9999, window.innerHeight || 9999) <= 920;
-	const narrowScreen = Math.min(window.screen.width || 9999, window.screen.height || 9999) <= 920;
-	if ((mobileUserAgent || coarsePointer || narrowViewport) && (narrowScreen || narrowViewport)) {
-		window.location.replace('mobile.html' + window.location.search + window.location.hash);
-	}
-}());
-		</script>
+		<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#001833"><style>html,body,#canvas{width:100%;height:100%;}#canvas{touch-action:none;}</style>
 	</head>
 	<body>
 		<canvas id="canvas">
@@ -169,10 +103,6 @@ body {
 
 		<div id="status">
 			<img id="status-splash" class="show-image--false fullsize--false use-filter--true" src="" alt="">
-			<div id="loading-copy" aria-live="polite">
-				<strong>집에 가고 싶다</strong>
-				<span>게임 불러오는 중...</span>
-			</div>
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
@@ -181,28 +111,15 @@ body {
 		<script>
 const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"executable":"index","experimentalVK":false,"focusCanvas":true,"gdextensionLibs":[],"mainPack":"game-smooth.pck","fileSizes":{"game-smooth.pck":2966712,"index.wasm":37695054}};
 const GODOT_THREADS_ENABLED = false;
-const GODOT_CANVAS = document.getElementById('canvas');
-GODOT_CONFIG.canvas = GODOT_CANVAS;
 const engine = new Engine(GODOT_CONFIG);
 
 (function () {
-	const canvas = GODOT_CANVAS;
 	const statusOverlay = document.getElementById('status');
 	const statusProgress = document.getElementById('status-progress');
 	const statusNotice = document.getElementById('status-notice');
 
 	let initializing = true;
 	let statusMode = '';
-
-	function fitCanvasToViewport() {
-		const viewport = window.visualViewport;
-		const width = Math.max(1, Math.round(viewport ? viewport.width : window.innerWidth));
-		const height = Math.max(1, Math.round(viewport ? viewport.height : window.innerHeight));
-		canvas.style.width = `${width}px`;
-		canvas.style.height = `${height}px`;
-		canvas.style.maxWidth = `${width}px`;
-		canvas.style.maxHeight = `${height}px`;
-	}
 
 	function setStatusMode(mode) {
 		if (statusMode === mode || !initializing) {
@@ -279,16 +196,6 @@ const engine = new Engine(GODOT_CONFIG);
 			displayFailureNotice(missingMsg + missing.join('\n'));
 		}
 	} else {
-		fitCanvasToViewport();
-		window.addEventListener('resize', fitCanvasToViewport, { passive: true });
-		window.addEventListener('orientationchange', () => {
-			setTimeout(fitCanvasToViewport, 120);
-		}, { passive: true });
-		if (window.visualViewport) {
-			window.visualViewport.addEventListener('resize', fitCanvasToViewport, { passive: true });
-			window.visualViewport.addEventListener('scroll', fitCanvasToViewport, { passive: true });
-		}
-
 		setStatusMode('progress');
 		engine.startGame({
 			'onProgress': function (current, total) {
@@ -301,8 +208,6 @@ const engine = new Engine(GODOT_CONFIG);
 				}
 			},
 		}).then(() => {
-			fitCanvasToViewport();
-			requestAnimationFrame(fitCanvasToViewport);
 			setStatusMode('hidden');
 		}, displayFailureNotice);
 	}
